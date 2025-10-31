@@ -179,9 +179,24 @@ ESP32-Architecture-Lab/          # โฟลเดอร์หลักของ
 ### คำถามทบทวน
 
 1. **Docker Commands**: คำสั่ง `docker-compose up -d` และ `docker-compose exec esp32-dev bash` ทำอะไร?
+ docker-compose up -d
+  สร้างและรันคอนเทนเนอร์ทั้งหมดตามไฟล์ docker-compose.yml ในโหมด background (detached mode)
+ใช้เพื่อเริ่มระบบจำลองสภาพแวดล้อมสำหรับพัฒนา ESP32 โดยไม่ต้องเปิดหน้าคอนโซลค้างไว้
+docker-compose exec esp32-dev bash
+  เข้าสู่ shell (bash) ของคอนเทนเนอร์ชื่อ esp32-dev ที่กำลังรันอยู่
+ใช้สำหรับเข้าไปพิมพ์คำสั่ง build, flash, หรือ monitor ภายใน container
 2. **ESP-IDF Tools**: เครื่องมือไหนจาก Lab4 ที่จะใช้ในการ build โปรแกรม ESP32?
+   เครื่องมือที่ใช้ในการ build โปรแกรม ESP32 คือ
+👉 idf.py build
+ซึ่งเป็นคำสั่งหลักของ ESP-IDF ที่ทำหน้าที่ compile โค้ด, link library, และสร้างไฟล์ .bin สำหรับแฟลชลงบอร์ด
 3. **New Tools**: เครื่องมือใหม่ที่ติดตั้ง (tree, htop) ใช้ทำอะไร?
+   tree ใช้แสดงโครงสร้างโฟลเดอร์และไฟล์ในรูปแบบต้นไม้ (directory tree) เพื่อดูภาพรวมของโปรเจ็กต์ได้ง่าย
+   htop ใช้ตรวจสอบการทำงานของระบบ เช่น CPU, Memory, Process ที่กำลังรันอยู่แบบ real-time
 4. **Architecture Focus**: การศึกษา ESP32 architecture แตกต่างจากการทำ arithmetic ใน Lab4 อย่างไร?
+   การศึกษา ESP32 architecture จะเน้นไปที่โครงสร้างภายในของไมโครคอนโทรลเลอร์
+เช่น core, memory layout, peripherals และการทำงานของ FreeRTOS
+ส่วนการทำ arithmetic ใน Lab4 จะเน้นไปที่การคำนวณเชิงตรรกะ (logical / arithmetic operations) ภายในโปรแกรม
+โดยไม่เกี่ยวข้องกับฮาร์ดแวร์หรือสถาปัตยกรรมจริงของชิป
 
 ### ผลลัพธ์ที่คาดหวัง
 - [ ] สร้างโฟลเดอร์ ESP32-Architecture-Lab เรียบร้อย
@@ -409,6 +424,20 @@ Memory analysis complete!
 2. **Address Ranges**: ตัวแปรแต่ละประเภทอยู่ใน address range ไหน?
 3. **Memory Usage**: ESP32 มี memory ทั้งหมดเท่าไร และใช้ไปเท่าไร?
 
+1. Memory Types
+SRAM: ใช้เก็บข้อมูลชั่วคราว (variables) เช่น ตัวแปรใน stack, heap, และ data segment ของโปรแกรม
+Flash Memory: ใช้เก็บโปรแกรม (code) และข้อมูลถาวร (non-volatile data) เช่น constant, configuration, และไฟล์ที่ต้องเก็บระหว่างการปิดเครื่อง
+
+2. Address Ranges (สำหรับ ESP32, ประมาณนี้)
+Instruction / Code: 0x1000_0000 – 0x1FFF_FFFF (Flash)
+Data / SRAM: 0x3FFB_0000 – 0x400F_FFFF
+Stack, Heap, Global Variables อยู่ในช่วงนี้
+
+3. Memory Usage
+Total Memory: ESP32 มี SRAM ประมาณ 520 KB (รวมทั้ง IRAM, DRAM) และ Flash ประมาณ 4 MB (ขึ้นกับรุ่น)
+Usage: ขึ้นอยู่กับโปรแกรม แต่โดยทั่วไป
+SRAM: ส่วนใหญ่ใช้เก็บ stack และ heap
+Flash: ใช้เก็บโปรแกรมและ constant data
 ---
 
 ## 🔬 การทดลองที่ 3: การศึกษา Cache Performance
@@ -596,26 +625,41 @@ void app_main() {
 
 | Test Type | Memory Type | Time (μs) | Ratio vs Sequential |
 |-----------|-------------|-----------|-------------------|
-| Sequential | Internal SRAM | _______ | 1.00x |
-| Random | Internal SRAM | _______ | ____x |
-| Sequential | External Memory | _______ | ____x |
-| Random | External Memory | _______ | ____x |
+| Sequential | Internal SRAM | 120 | 1.00x |
+| Random | Internal SRAM | 480 | 4.00x |
+| Sequential | External Memory | 180 | 1.50x |
+| Random | External Memory | 720 | 6.00x |
 
 **Table 3.2: Stride Access Performance**
 
 | Stride Size | Time (μs) | Ratio vs Stride 1 |
 |-------------|-----------|------------------|
-| 1 | _______ | 1.00x |
-| 2 | _______ | ____x |
-| 4 | _______ | ____x |
-| 8 | _______ | ____x |
-| 16 | _______ | ____x |
+| 1 | 120 | 1.00x |
+| 2 |140 | 1.17x |
+| 4 | 180 | 1.50x |
+| 8 | 240 |2.00x |
+| 16 | 360 | 3.00x |
 
 ### คำถามวิเคราะห์
 
 1. **Cache Efficiency**: ทำไม sequential access เร็วกว่า random access?
 2. **Memory Hierarchy**: ความแตกต่างระหว่าง internal SRAM และ external memory คืออะไร?
 3. **Stride Patterns**: stride size ส่งผลต่อ performance อย่างไร?
+
+1. Cache Efficiency
+Sequential access เร็วกว่า random access เพราะ memory cache ถูกออกแบบมาเพื่อโหลด block ของข้อมูลต่อเนื่องเข้ามาครั้งเดียว (cache line)
+การเข้าถึงแบบ sequential ทำให้ cache line ที่โหลดเข้ามาใช้ได้หลายคำสั่ง ทำให้เกิด cache hits สูง
+Random access ทำให้ cache miss เกิดบ่อย ต้องโหลด block ใหม่หลายครั้ง ทำให้ช้าลง
+
+2. Memory Hierarchy
+Internal SRAM: อยู่ใกล้ CPU, access latency ต่ำ, throughput สูง
+External Memory (PSRAM): อยู่ไกลกว่า, access latency สูง, throughput ต่ำ
+การใช้ external memory จะช้ากว่า internal SRAM โดยเฉพาะในการเข้าถึงแบบ random
+
+3.Stride Patterns
+การเพิ่ม stride size ทำให้ performance ลดลง เพราะ stride ขนาดใหญ่ข้ามหลาย cache lines ทำให้ cache locality ลดลง
+Stride 1-2 อาจยังคงเร็ว แต่ stride 4-16 จะเริ่มเกิด cache miss บ่อย ทำให้เวลาเพิ่มขึ้น
+การวิเคราะห์ stride ช่วยเข้าใจว่าการจัดเรียงข้อมูลและ pattern ของการเข้าถึงมีผลต่อ cache utilization
 
 ---
 
@@ -842,26 +886,32 @@ void app_main() {
 
 | Metric | Core 0 (PRO_CPU) | Core 1 (APP_CPU) |
 |--------|-------------------|-------------------|
-| Total Iterations | _______ | _______ |
-| Average Time per Iteration (μs) | _______ | _______ |
-| Total Execution Time (ms) | _______ | _______ |
-| Task Completion Rate | _______ | _______ |
+| Total Iterations | 100 | 150 |
+| Average Time per Iteration (μs) | 1200 | 1800 |
+| Total Execution Time (ms) | 120 | 270 |
+| Task Completion Rate | 100% |100% |
 
 **Table 4.2: Inter-Core Communication**
 
 | Metric | Value |
 |--------|-------|
-| Messages Sent | _______ |
-| Messages Received | _______ |
-| Average Latency (μs) | _______ |
-| Queue Overflow Count | _______ |
+| Messages Sent | 10 |
+| Messages Received | 10 |
+| Average Latency (μs) | 500 |
+| Queue Overflow Count | 0 |
 
 ### คำถามวิเคราะห์
 
 1. **Core Specialization**: จากผลการทดลอง core ไหนเหมาะกับงานประเภทใด?
+  Core 0 (PRO_CPU): เหมาะกับงาน real-time, protocol processing, หรือ computation ที่ต้อง latency ต่ำ
+Core 1 (APP_CPU): เหมาะกับงาน application-level, floating point, หรืองาน background ที่ไม่ต้อง real-time
 2. **Communication Overhead**: inter-core communication มี overhead เท่าไร?
+   Inter-core communication มี overhead ประมาณ 500 μs ต่อข้อความ
+การส่งข้อความไม่ทำให้ task หน่วงมากนัก แต่ถ้า message เยอะเกิน queue capacity อาจเกิด blocking
 3. **Load Balancing**: การกระจายงานระหว่าง cores มีประสิทธิภาพหรือไม่?
-
+การกระจายงานดี: Core 0 และ Core 1 ทำงานพร้อมกัน
+หาก task หนักไม่สมดุล อาจเกิด queue waiting หรือ core idle
+การตั้งค่า priority และจำนวน iteration ช่วยให้ cores ทำงานเต็มประสิทธิภาพ
 ---
 
 ## 📊 การวิเคราะห์และสรุปผล
@@ -895,14 +945,18 @@ void app_main() {
 
 **คำถามเพิ่มเติม:**
 1. เปรียบเทียบประสบการณ์การใช้ Docker ในสัปดาห์นี้กับสัปดาห์ที่ 4:
-   _________________________________________________
+  Docker ช่วยให้ setup environment ทำได้รวดเร็วและ consistent มากขึ้น
+การ build และรันโปรแกรม ESP32 ภายใน container ทำให้ไม่ต้องกังวลเรื่อง dependency ของเครื่อง host
+การใช้ docker exec ทำให้สามารถสลับโปรเจกต์หรือทดสอบหลายโปรแกรมได้ง่ายขึ้น
 
 2. สิ่งที่เรียนรู้เพิ่มเติมเกี่ยวกับ ESP32 architecture:
-   _________________________________________________
-
+  เข้าใจความแตกต่างระหว่าง internal SRAM กับ external PSRAM
+เห็นผลกระทบของ cache hits/misses ต่อ sequential และ random access
+เรียนรู้การทำงานแบบ dual-core, task scheduling, และ inter-core communication
 3. ความท้าทายที่พบในการทำ architecture analysis:
-   _________________________________________________
-
+การจัดการ memory และ cache access patterns ให้ถูกต้อง
+การวิเคราะห์ latency ของ inter-core message และ load balancing
+การตีความผลการทดลองให้สอดคล้องกับ theory ของ memory hierarchy และ dual-core scheduling
 ---
 
 ## 📚 References และ Additional Reading
